@@ -1,3 +1,4 @@
+import os
 from fastapi import FastAPI
 import yfinance as yf
 import requests
@@ -5,10 +6,15 @@ import numpy as np
 import tensorflow as tf
 from sklearn.preprocessing import MinMaxScaler
 from textblob import TextBlob
+import uvicorn
+
+# Disable GPU usage if you're not using a GPU to avoid TensorFlow warnings
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"  # Disable GPU usage
 
 app = FastAPI()
+
 MODEL_CACHE = {}
-NEWS_API_KEY = "your_news_api_key_here"
+NEWS_API_KEY = "your_news_api_key_here"  # Replace this with a valid API key
 
 def fetch_stock_details(symbol):
     """Fetch stock details and calculate technical indicators."""
@@ -62,6 +68,7 @@ def get_lstm_prediction(symbol):
         if symbol in MODEL_CACHE:
             model, scaler = MODEL_CACHE[symbol]
         else:
+            # Training the LSTM model if not in cache
             scaler = MinMaxScaler(feature_range=(0, 1))
             data = scaler.fit_transform(df.values.reshape(-1, 1))
             
@@ -89,7 +96,10 @@ def get_lstm_prediction(symbol):
         future_input = last_60_days_scaled.reshape(1, 60, 1)
         predicted_price = scaler.inverse_transform(model.predict(future_input))[0][0]
         
-        return float(predicted_price + (news_sentiment * predicted_price * 0.01))  # Adjust prediction with sentiment
+        # Adjust prediction based on sentiment
+        adjusted_prediction = predicted_price + (news_sentiment * predicted_price * 0.01)
+        
+        return float(adjusted_prediction)
     except Exception as e:
         return {"error": f"Stock prediction failed: {str(e)}"}
 
@@ -110,4 +120,8 @@ def get_stock_info(symbol: str):
         "predicted_price": predicted_price,
         "advice": f"Based on analysis, it is recommended to {recommendation}."
     }
- 
+
+# Start the FastAPI app with dynamic port using the environment variable
+if __name__ == "__main__":
+    port = int(os.getenv("PORT", 8000))  # Use the PORT environment variable, default to 8000 if not set
+    uvicorn.run(app, host="0.0.0.0", port=port)
