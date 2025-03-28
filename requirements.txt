@@ -5,5 +5,4 @@ yfinance
 numpy
 pandas
 scikit-learn
-tensorflow
 textblob
